@@ -58,8 +58,12 @@ scripts/         Entry points
 
 - **Code, configs, dashboard, n8n workflow, report, slides** — complete and pushed.
 - **Attacker (OpenRouter / Mixtral-8x22B)** — verified live.
-- **Target / Judge (OpenAI / GPT-4o)** — pending: the OpenAI project key was waiting on credit propagation at the time of release. All experiment runs are reproducible end-to-end by `bash scripts/run_all.sh` once the OpenAI account is active.
-- **Synthetic demo traces** (`results/traces/demo_synthetic.jsonl`) are bundled so the dashboard renders out-of-the-box. They are clearly marked `extra.demo = true` and will be replaced by real traces after the experimental grid is executed.
+- **Target / Judge (OpenAI / GPT-4o)** — live; experiment grid partially executed (see `results/summary.csv`). Remaining cells (PromptGuard, Llama-Guard-3 over PAIR/TAP) are scaffolded and can be run via `bash scripts/run_all.sh`.
+- **Synthetic demo traces** (`results/traces/demo_synthetic.jsonl`) are bundled so the dashboard renders out-of-the-box. They are clearly marked `extra.demo = true` and are **excluded from `results/summary.csv` by default** (rerun `python scripts/aggregate_results.py --include-demo` to fold them in). The dashboard offers an explicit *Real API Runs* vs *Demo Traces* toggle.
+
+### Reading the headline numbers
+
+The judge in `configs/base.yaml` uses `success_threshold: 10`, matching Chao et al. (PAIR, Appendix A). That is a strict bar; many HarmBench-style reproductions report ASR at judge ≥ 7 or ≥ 8 instead. The dashboard exposes a *judge threshold* selector and the API returns both the strict `ASR` (judge == 10) and `ASR_at_threshold` (per-session max judge ≥ selected cutoff) for every cell.
 
 ## Quick Start
 

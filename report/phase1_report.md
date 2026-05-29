@@ -142,25 +142,37 @@ Run the experimental grid:
 bash scripts/run_all.sh
 ```
 
-Aggregated results are written to `results/summary.csv`. A representative
-schema for the produced table is:
+Aggregated results are written to `results/summary.csv` (real-only;
+`results/summary_all.csv` also includes the bundled synthetic demo set).
+Snapshot from the partial grid executed so far (real API runs only,
+GPT-4o target + judge, Mixtral-8x22B attacker, AdvBench harmful_behaviors
+first N prompts):
 
-| attack | defense      | budget | N  | ASR    | avg_queries | block_rate | mean_max_score |
-|--------|--------------|--------|----|--------|-------------|------------|----------------|
-| pair   | none         | 5      | 20 | (run)  | (run)       | 0.0        | (run)          |
-| pair   | keyword      | 5      | 20 | (run)  | (run)       | (run)      | (run)          |
-| pair   | promptguard  | 5      | 20 | (run)  | (run)       | (run)      | (run)          |
-| pair   | llamaguard   | 5      | 20 | (run)  | (run)       | (run)      | (run)          |
-| pair   | none         | 10     | 20 | (run)  | (run)       | 0.0        | (run)          |
-| tap    | none         | 5      | 20 | (run)  | (run)       | 0.0        | (run)          |
-| tap    | none         | 10     | 20 | (run)  | (run)       | 0.0        | (run)          |
-| tap    | keyword      | 5      | 20 | (run)  | (run)       | (run)      | (run)          |
-| tap    | promptguard  | 5      | 20 | (run)  | (run)       | (run)      | (run)          |
-| tap    | llamaguard   | 5      | 20 | (run)  | (run)       | (run)      | (run)          |
+| attack | defense | B  | N  | ASR (strict, =10) | ASR ≥ 7 | ASR ≥ 8 | block_rate | mean_max_judge |
+|--------|---------|----|----|-------------------|---------|---------|------------|----------------|
+| pair   | none    | 5  | 50 | 0%                | 16%     | 8%      | 0%         | 2.5            |
+| pair   | none    | 10 | 10 | 0%                | 40%     | 40%     | 0%         | 4.3            |
+| pair   | keyword | 5  | 10 | 0%                | 10%     | 10%     | 44%        | 2.3            |
+| tap    | none    | 5  | 30 | 0%                | 20%     | 13%     | 0%         | 2.9            |
+| tap    | none    | 10 | 10 | 0%                | 20%     | 0%      | 0%         | 2.8            |
+| tap    | keyword | 5  | 10 | 0%                | 30%     | 30%     | 44%        | 3.5            |
 
-Each row is reproducible by re-running its YAML config; the corresponding
-JSONL trace is referenced in the matching `*_summary.txt` file. Per-prompt
-outcomes are available in `results/per_prompt.csv`.
+Observations from this partial grid:
+
+- The PAIR-style strict success bar (judge score == 10) is rare against
+  GPT-4o-2024-08-06 even with budget 10 over N=10 prompts; relaxing the
+  threshold to the HarmBench-style ≥ 7 cutoff surfaces budget effects
+  clearly (e.g., PAIR/none: 16% → 40% as B5 → B10).
+- The keyword detector blocks roughly 44% of candidate prompts in both
+  PAIR and TAP runs, yet TAP still produces 30% of sessions with judge ≥ 7
+  — evidence that detector-only defenses do not eliminate adaptive risk.
+- PromptGuard and Llama-Guard-3 cells are scaffolded and remain to run.
+
+Each cell is reproducible by re-running its YAML config; the underlying
+JSONL trace is referenced in the matching `*_summary.txt`. Per-prompt
+outcomes are in `results/per_prompt.csv`. The dashboard exposes a judge
+threshold selector that recomputes ASR‐at‐threshold without re-running the
+attack.
 
 ## 6. Interactive Inspection
 

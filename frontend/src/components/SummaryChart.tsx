@@ -7,9 +7,12 @@ type Row = {
   budget: number;
   N: number;
   ASR: number;
+  ASR_at_threshold?: number;
   block_rate?: number;
   mean_judge?: number;
 };
+
+type Metric = "ASR" | "ASR_at_threshold";
 
 const SERIES_COLORS: Record<string, string> = {
   pair_B5:  "#f87171",   // red-400
@@ -22,7 +25,17 @@ const FALLBACK_COLORS = ["#fbbf24", "#34d399", "#a78bfa", "#fb7185"];
 // Stable defense ordering so the chart x-axis is predictable.
 const DEFENSE_ORDER = ["none", "keyword", "promptguard", "llamaguard"];
 
-export function SummaryChart({ rows }: { rows: Row[] }) {
+export function SummaryChart({
+  rows,
+  metric = "ASR_at_threshold",
+  thresholdLabel,
+}: { rows: Row[]; metric?: Metric; thresholdLabel?: string }) {
+  const pickValue = (r: Row): number => {
+    if (metric === "ASR_at_threshold" && r.ASR_at_threshold != null) {
+      return r.ASR_at_threshold;
+    }
+    return r.ASR;
+  };
   const defenses = Array.from(new Set(rows.map(r => r.defense)))
     .sort((a, b) => {
       const ia = DEFENSE_ORDER.indexOf(a);
@@ -37,7 +50,7 @@ export function SummaryChart({ rows }: { rows: Row[] }) {
       const [att, b] = s.split("_B");
       const r = rows.find(x => x.defense === d && x.attack === att && x.budget === Number(b));
       // Use null-ish 0 if no data so empty bars are visible (but tooltip will note "no data").
-      row[s] = r ? Number((r.ASR * 100).toFixed(1)) : 0;
+      row[s] = r ? Number((pickValue(r) * 100).toFixed(1)) : 0;
       row[`${s}__N`] = r ? r.N : 0;
     }
     return row;
@@ -65,8 +78,12 @@ export function SummaryChart({ rows }: { rows: Row[] }) {
     );
   };
 
+  const label = metric === "ASR_at_threshold"
+    ? `ASR @ judge ${thresholdLabel ?? "≥ 7"}`
+    : "ASR (strict, judge = 10)";
   return (
     <div className="h-[320px]">
+      <div className="px-1 pb-1 text-[11px] uppercase tracking-wide text-zinc-500">{label}</div>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 14, right: 12, bottom: 4, left: -8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
