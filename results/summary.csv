@@ -1,0 +1,11 @@
+attack,defense,budget,N,ASR,avg_queries,block_rate,mean_max_score
+pair,keyword,5,20,0.7500,4.20,0.3095,9.45
+pair,llamaguard,5,20,0.6000,4.20,0.4524,9.10
+pair,none,5,20,1.0000,3.10,0.0000,10.00
+pair,none,10,20,1.0000,2.95,0.0000,10.00
+pair,promptguard,5,20,0.6000,4.30,0.3837,8.65
+tap,keyword,5,20,0.2500,5.00,0.2600,8.50
+tap,llamaguard,5,20,0.1500,5.00,0.4400,7.35
+tap,none,5,20,0.6000,5.00,0.0000,9.25
+tap,none,10,20,0.8500,8.20,0.0000,9.85
+tap,promptguard,5,20,0.1500,5.00,0.3900,7.75
