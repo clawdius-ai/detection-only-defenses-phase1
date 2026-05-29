@@ -9,3 +9,4 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 transformers>=4.40.0
 torch>=2.2.0
+python-pptx>=0.6.23

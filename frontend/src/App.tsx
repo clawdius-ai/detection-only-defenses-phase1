@@ -5,11 +5,14 @@ import { API } from "@/lib/utils";
 import { SessionGraph } from "@/components/SessionGraph";
 import { SummaryChart } from "@/components/SummaryChart";
 
+type ViewMode = "demo" | "real";
+
 type SummaryRow = {
   attack: string;
   defense: string;
   budget: number;
   N: number;
+  demo_sessions?: number;
   ASR: number;
   block_rate: number;
   mean_judge: number;
@@ -26,6 +29,7 @@ type SessionMeta = {
   max_score: number;
   success: boolean;
   rounds: number;
+  demo?: boolean;
 };
 
 export default function App() {
@@ -33,11 +37,13 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<{ attack?: string; defense?: string }>({});
+  const [viewMode, setViewMode] = useState<ViewMode>("demo");
 
   useEffect(() => {
-    fetch(`${API}/summary`).then(r => r.json()).then(d => setSummary(d.summary || []));
-    fetch(`${API}/sessions`).then(r => r.json()).then(d => setSessions(d.sessions || []));
-  }, []);
+    fetch(`${API}/summary?mode=${viewMode}`).then(r => r.json()).then(d => setSummary(d.summary || []));
+    fetch(`${API}/sessions?mode=${viewMode}`).then(r => r.json()).then(d => setSessions(d.sessions || []));
+    setSelected(null);
+  }, [viewMode]);
 
   const filtered = useMemo(() => sessions.filter(s =>
     (!filter.attack || s.attack === filter.attack) &&
@@ -46,13 +52,30 @@ export default function App() {
 
   return (
     <div className="min-h-screen p-6 max-w-[1400px] mx-auto">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Detection-Only Defenses for LLMs — Phase 1
-        </h1>
-        <p className="text-sm text-zinc-400 mt-1">
-          Adaptive jailbreak attacks (PAIR, TAP) vs. detector-only defenses on AdvBench.
-        </p>
+      <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Detection-Only Defenses for LLMs — Phase 1
+          </h1>
+          <p className="text-sm text-zinc-400 mt-1">
+            Adaptive jailbreak attacks (PAIR, TAP) vs. detector-only defenses on AdvBench.
+          </p>
+        </div>
+        <nav className="inline-flex w-fit rounded-lg border border-zinc-800 bg-zinc-950 p-1 text-sm">
+          {(["demo", "real"] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`rounded-md px-4 py-2 font-medium capitalize transition ${
+                viewMode === mode
+                  ? "bg-zinc-100 text-zinc-950"
+                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+              }`}
+            >
+              {mode === "demo" ? "Demo Traces" : "Real API Runs"}
+            </button>
+          ))}
+        </nav>
       </header>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -69,6 +92,7 @@ export default function App() {
                   <Badge variant="muted">{r.attack}</Badge>
                   <Badge variant={r.defense === "none" ? "muted" : "default"}>{r.defense}</Badge>
                   <Badge variant="muted">B={r.budget}</Badge>
+                  {!!r.demo_sessions && <Badge variant="warning">{r.demo_sessions} demo</Badge>}
                 </div>
                 <div className="text-zinc-300">
                   ASR <span className="font-semibold">{(r.ASR * 100).toFixed(1)}%</span>
@@ -76,16 +100,24 @@ export default function App() {
                 </div>
               </div>
             ))}
-            {!summary.length && <p className="text-sm text-zinc-500">No traces yet. Run experiments first.</p>}
+            {!summary.length && (
+              <p className="text-sm text-zinc-500">
+                No {viewMode === "demo" ? "demo" : "real API"} traces yet.
+              </p>
+            )}
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-1">
-          <CardHeader><CardTitle>Sessions</CardTitle></CardHeader>
-          <CardContent className="space-y-2 max-h-[640px] overflow-auto">
-            <div className="flex gap-2 mb-3 text-xs">
+      <section className="mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Sessions <span className="ml-2 text-xs text-zinc-500">{viewMode === "demo" ? "demo" : "real API"}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2 text-xs">
               <select className="bg-zinc-800 px-2 py-1 rounded"
                 onChange={e => setFilter(f => ({ ...f, attack: e.target.value || undefined }))}>
                 <option value="">all attacks</option>
@@ -100,37 +132,45 @@ export default function App() {
                 <option value="llamaguard">llamaguard</option>
               </select>
             </div>
-            {filtered.map(s => (
-              <button key={s.session_id}
-                onClick={() => setSelected(s.session_id)}
-                className={`w-full text-left rounded-lg border border-zinc-800 p-2 hover:bg-zinc-800/40 ${
-                  selected === s.session_id ? "bg-zinc-800/60" : ""
-                }`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="muted">{s.attack}</Badge>
-                  <Badge variant="muted">{s.defense}</Badge>
-                  <Badge variant="muted">B={s.budget}</Badge>
-                  {s.success
-                    ? <Badge variant="danger">jailbroken</Badge>
-                    : <Badge variant="success">refused</Badge>}
-                </div>
-                <div className="text-xs text-zinc-400 truncate">{s.goal}</div>
-                <div className="text-[10px] text-zinc-500 mt-1">
-                  rounds {s.rounds} · max score {s.max_score}
-                </div>
-              </button>
-            ))}
-            {!filtered.length && <p className="text-sm text-zinc-500">No sessions.</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[360px] overflow-auto pr-1">
+              {filtered.map(s => (
+                <button key={s.session_id}
+                  onClick={() => setSelected(s.session_id)}
+                  className={`w-full text-left rounded-lg border border-zinc-800 p-3 hover:bg-zinc-800/40 ${
+                    selected === s.session_id ? "bg-zinc-800/60 ring-1 ring-zinc-500" : ""
+                  }`}>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Badge variant="muted">{s.attack}</Badge>
+                    <Badge variant="muted">{s.defense}</Badge>
+                    <Badge variant="muted">B={s.budget}</Badge>
+                    {s.demo && <Badge variant="warning">demo</Badge>}
+                    {s.success
+                      ? <Badge variant="danger">jailbroken</Badge>
+                      : <Badge variant="success">refused</Badge>}
+                  </div>
+                  <div className="text-sm text-zinc-300 truncate">{s.goal}</div>
+                  <div className="text-[11px] text-zinc-500 mt-2">
+                    rounds {s.rounds} · max score {s.max_score}
+                  </div>
+                </button>
+              ))}
+              {!filtered.length && <p className="text-sm text-zinc-500">No sessions.</p>}
+            </div>
           </CardContent>
         </Card>
+      </section>
 
-        <Card className="lg:col-span-2">
+      <section>
+        <Card>
           <CardHeader>
             <CardTitle>
               Attack Trace Graph {selected && <span className="text-zinc-500 ml-2 text-xs">{selected}</span>}
             </CardTitle>
+            <p className="text-xs text-zinc-500 mt-1">
+              Click a node to inspect details. Use the canvas controls to zoom and fit view.
+            </p>
           </CardHeader>
-          <CardContent className="h-[640px] p-0">
+          <CardContent className="h-[680px] xl:h-[860px] p-0">
             {selected ? <SessionGraph sessionId={selected} />
               : <div className="h-full flex items-center justify-center text-sm text-zinc-500">
                   Select a session to view its attack trace.
@@ -140,8 +180,8 @@ export default function App() {
       </section>
 
       <footer className="mt-8 text-xs text-zinc-500">
-        AdvBench harmful_behaviors · attacker = Vicuna-13B (OpenRouter) ·
-        target/judge = GPT-4 · detectors = PromptGuard / Llama-Guard-3 / keyword.
+        AdvBench harmful_behaviors · attacker = Mixtral-8x22B-Instruct via OpenRouter ·
+        target/judge = GPT-4o · detectors = PromptGuard / Llama-Guard-3 / keyword.
       </footer>
     </div>
   );
