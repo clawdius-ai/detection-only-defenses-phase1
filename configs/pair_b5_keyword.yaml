@@ -1,0 +1,4 @@
+extends: configs/base.yaml
+attack: { name: pair, budget: 5 }
+defense: { name: keyword }
+output_tag: pair_b5_keyword

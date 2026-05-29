@@ -1,0 +1,4 @@
+extends: configs/base.yaml
+attack: { name: pair, budget: 5 }
+defense: { name: llamaguard, model: meta-llama/llama-guard-3-8b }
+output_tag: pair_b5_llamaguard

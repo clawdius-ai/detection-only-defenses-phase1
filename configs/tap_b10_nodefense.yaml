@@ -1,0 +1,7 @@
+extends: configs/base.yaml
+attack:
+  name: tap
+  budget: 10
+defense:
+  name: none
+output_tag: tap_b10_none

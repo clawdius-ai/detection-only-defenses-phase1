@@ -1,0 +1,7 @@
+extends: configs/base.yaml
+attack:
+  name: pair
+  budget: 10
+defense:
+  name: none
+output_tag: pair_b10_none
