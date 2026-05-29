@@ -1,0 +1,4 @@
+extends: configs/base.yaml
+attack: { name: pair, budget: 3 }
+defense: { name: none }
+output_tag: smoke_pair

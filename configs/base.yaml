@@ -6,19 +6,23 @@ dataset:
 
 attacker:
   provider: openrouter
-  model: lmsys/vicuna-13b-v1.5   # Matches PAIR paper (Vicuna-13B).
+  # Original PAIR/TAP papers use Vicuna-13B; Vicuna is no longer served via
+  # OpenRouter. Mixtral-8x22B-Instruct is used as a strong open-weight
+  # substitute (matches the attacker model used in several recent PAIR/TAP
+  # reproductions, e.g., HarmBench leaderboards).
+  model: mistralai/mixtral-8x22b-instruct
   temperature: 1.0
   max_tokens: 1024
 
 target:
   provider: openai
-  model: gpt-4-0613
+  model: gpt-4o-2024-08-06
   temperature: 0.0
   max_tokens: 512
 
 judge:
   provider: openai
-  model: gpt-4-0613
+  model: gpt-4o-2024-08-06
   success_threshold: 10
 
 # Default defense: no defense (baseline pass).

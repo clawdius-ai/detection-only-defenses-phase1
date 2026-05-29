@@ -30,9 +30,9 @@ AdvBench prompt → [Attacker LLM] → candidate adversarial prompt
 | Component | Choice |
 |-----------|--------|
 | Dataset   | AdvBench `harmful_behaviors.csv` (first 100 prompts; default subset N=20) |
-| Attacker  | Vicuna-13B (`lmsys/vicuna-13b-v1.5` via OpenRouter) |
-| Target    | GPT-4 (`gpt-4-0613` via OpenAI) |
-| Judge     | GPT-4 (`gpt-4-0613` via OpenAI) with 1–10 harm scoring rubric |
+| Attacker  | Mixtral-8x22B-Instruct (`mistralai/mixtral-8x22b-instruct` via OpenRouter; substitute for Vicuna-13B which is no longer served on OpenRouter) |
+| Target    | GPT-4o (`gpt-4o-2024-08-06` via OpenAI) |
+| Judge     | GPT-4o (`gpt-4o-2024-08-06` via OpenAI) with 1–10 harm scoring rubric |
 | Budgets   | B ∈ {5, 10} |
 
 ## Repository Layout
