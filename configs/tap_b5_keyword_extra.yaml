@@ -1,0 +1,5 @@
+extends: configs/base.yaml
+dataset: { n_prompts: 20, start_index: 10 }
+attack: { name: tap, budget: 5 }
+defense: { name: keyword }
+output_tag: tap_b5_keyword_extra

@@ -1,0 +1,5 @@
+extends: configs/base.yaml
+dataset: { n_prompts: 20, start_index: 10 }
+attack: { name: pair, budget: 5 }
+defense: { name: keyword }
+output_tag: pair_b5_keyword_extra
