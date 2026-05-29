@@ -37,7 +37,7 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<{ attack?: string; defense?: string }>({});
-  const [viewMode, setViewMode] = useState<ViewMode>("demo");
+  const [viewMode, setViewMode] = useState<ViewMode>("real");
 
   useEffect(() => {
     fetch(`${API}/summary?mode=${viewMode}`).then(r => r.json()).then(d => setSummary(d.summary || []));
