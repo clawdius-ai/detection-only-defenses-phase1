@@ -54,6 +54,13 @@ report/          Phase 1 markdown report
 scripts/         Entry points
 ```
 
+## Status
+
+- **Code, configs, dashboard, n8n workflow, report, slides** — complete and pushed.
+- **Attacker (OpenRouter / Mixtral-8x22B)** — verified live.
+- **Target / Judge (OpenAI / GPT-4o)** — pending: the OpenAI project key was waiting on credit propagation at the time of release. All experiment runs are reproducible end-to-end by `bash scripts/run_all.sh` once the OpenAI account is active.
+- **Synthetic demo traces** (`results/traces/demo_synthetic.jsonl`) are bundled so the dashboard renders out-of-the-box. They are clearly marked `extra.demo = true` and will be replaced by real traces after the experimental grid is executed.
+
 ## Quick Start
 
 ```bash

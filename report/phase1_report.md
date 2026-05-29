@@ -116,7 +116,25 @@ the next depth.
 - **Average queries per behavior**: mean target queries used per behavior
   (the attacker may terminate early on a success).
 
-## 5. Results
+## 5. Reproducibility and Current Status
+
+At the time of this report, the codebase is complete and the OpenRouter
+attacker integration is verified live; the OpenAI target/judge integration
+awaits credit propagation on the `Default` project of the `Clawdius`
+organization. The experimental grid is fully driven by YAML configs and is
+reproducible with:
+
+```bash
+bash scripts/run_all.sh
+python scripts/aggregate_results.py
+```
+
+To enable the dashboard prior to the live run, the repository ships a
+synthetic demo trace file (`results/traces/demo_synthetic.jsonl`). All
+records in that file set `extra.demo = true` and are intended solely for
+visualization preview; they will be removed once real traces are produced.
+
+## 6. Results
 
 Run the experimental grid:
 
