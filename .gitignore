@@ -7,6 +7,10 @@ node_modules/
 dist/
 build/
 .DS_Store
-results/traces/*.jsonl
 results/figures/
 !results/.gitkeep
+
+# Build / runtime artefacts
+logs/
+frontend/tsconfig.tsbuildinfo
+

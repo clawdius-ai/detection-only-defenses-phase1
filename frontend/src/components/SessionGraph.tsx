@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import ReactFlow, { Background, Controls, MiniMap, Node, Edge, MarkerType } from "reactflow";
 import { API } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,13 @@ type Round = {
   target_response: string;
   judge_score: number;
   success: boolean;
-  extra?: { improvement?: string; depth?: number; on_topic?: boolean; detector_label?: string };
+  extra?: {
+    improvement?: string;
+    depth?: number;
+    on_topic?: boolean;
+    detector_label?: string;
+    demo?: boolean;
+  };
 };
 
 type Detail = { session_id: string; rounds: Round[] };
@@ -42,7 +48,13 @@ function scoreBarColor(score: number): string {
 
 function shortText(text: string, max = 86): string {
   if (!text) return "";
-  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+async function copyToClipboard(s: string) {
+  try {
+    await navigator.clipboard.writeText(s);
+  } catch { /* ignore */ }
 }
 
 export function SessionGraph({ sessionId }: { sessionId: string }) {
@@ -59,9 +71,26 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
     });
   }, [sessionId]);
 
-  const sessionKind = detail?.rounds[0]?.parent_round === 1 ? "tap" : detail?.rounds.length
-    ? detail.rounds.some(r => r.parent_round != null && r.parent_round !== r.round - 1) ? "tap" : "pair"
-    : "session";
+  // Heuristic: TAP traces have rounds with non-linear parent_round refs.
+  const sessionKind = useMemo(() => {
+    if (!detail?.rounds.length) return "session";
+    const r0 = detail.rounds[0];
+    if (r0.extra?.depth != null) return "tap";
+    return detail.rounds.some(r => r.parent_round != null && r.parent_round !== r.round - 1)
+      ? "tap" : "pair";
+  }, [detail]);
+
+  // Aggregate session-level info for the header.
+  const sessionStats = useMemo(() => {
+    if (!detail?.rounds.length) return null;
+    const r = detail.rounds;
+    const maxJudge = Math.max(...r.map(x => x.judge_score));
+    const blocked = r.filter(x => x.detector_decision === "block").length;
+    const success = r.some(x => x.success);
+    const detectorScores = r.map(x => x.detector_score).filter((v): v is number => v != null);
+    const maxDet = detectorScores.length ? Math.max(...detectorScores) : null;
+    return { maxJudge, blocked, success, total: r.length, maxDet };
+  }, [detail]);
 
   const { nodes, edges } = useMemo(() => {
     if (!detail) return { nodes: [] as Node[], edges: [] as Edge[] };
@@ -74,13 +103,11 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
     }
     const xByRound: Record<number, number> = {};
     const yByRound: Record<number, number> = {};
-    const depthOfRound: Record<number, number> = {};
 
     function assign(parentKey: string, depth: number, yStart: number): number {
       const kids = childrenByParent[parentKey] || [];
       let y = yStart;
       for (const k of kids) {
-        depthOfRound[k.round] = depth;
         const sub = assign(String(k.round), depth + 1, y);
         const ownY = sub > y ? (y + sub - 116) / 2 : y;
         xByRound[k.round] = depth * 290;
@@ -159,6 +186,28 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
     return { nodes, edges };
   }, [detail, selectedRound]);
 
+  // Keyboard navigation: ← → step between rounds (in temporal order).
+  const stepRound = useCallback((delta: number) => {
+    if (!detail?.rounds.length) return;
+    const idx = Math.max(
+      0,
+      detail.rounds.findIndex(r => r.round === selectedRound?.round),
+    );
+    const next = detail.rounds[Math.min(detail.rounds.length - 1, Math.max(0, idx + delta))];
+    if (next) setSelectedRound(next);
+  }, [detail, selectedRound]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (e.key === "ArrowLeft") { e.preventDefault(); stepRound(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); stepRound(1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stepRound]);
+
   const visibleRound = selectedRound || detail?.rounds[0] || null;
 
   return (
@@ -166,12 +215,44 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
       <div className="min-h-0 flex-1 border-b border-zinc-800 relative">
         <div className="absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950/90 px-3 py-2 text-xs shadow">
           <Badge variant="muted">{sessionKind}</Badge>
-          <span className="text-zinc-400">{detail?.rounds.length ?? 0} nodes</span>
+          {sessionStats && (
+            <>
+              <span className="text-zinc-400">{sessionStats.total} nodes</span>
+              <span className="text-zinc-500">·</span>
+              <span className="text-zinc-400">max judge {sessionStats.maxJudge}/10</span>
+              <span className="text-zinc-500">·</span>
+              <span className="text-zinc-400">{sessionStats.blocked} blocked</span>
+              {sessionStats.maxDet != null && (
+                <>
+                  <span className="text-zinc-500">·</span>
+                  <span className="text-zinc-400">max det {sessionStats.maxDet.toFixed(2)}</span>
+                </>
+              )}
+            </>
+          )}
+        </div>
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/90 px-1.5 py-1 text-xs shadow">
+          <button
+            onClick={() => stepRound(-1)}
+            className="rounded px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+            title="Previous round (←)">←</button>
+          <span className="px-1.5 text-zinc-400 font-mono">
+            {visibleRound ? `${visibleRound.round}/${detail?.rounds[detail.rounds.length-1]?.round ?? "?"}` : "-"}
+          </span>
+          <button
+            onClick={() => stepRound(1)}
+            className="rounded px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+            title="Next round (→)">→</button>
+        </div>
+        <div className="absolute right-4 bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950/90 px-2.5 py-1.5 text-[10px] shadow">
           <span className="flex items-center gap-1 text-zinc-400">
             <span className="h-2.5 w-2.5 rounded-sm bg-[#64748b]" /> low
           </span>
           <span className="flex items-center gap-1 text-zinc-400">
             <span className="h-2.5 w-2.5 rounded-sm bg-[#84cc16]" /> partial
+          </span>
+          <span className="flex items-center gap-1 text-zinc-400">
+            <span className="h-2.5 w-2.5 rounded-sm bg-[#f59e0b]" /> high risk
           </span>
           <span className="flex items-center gap-1 text-zinc-400">
             <span className="h-2.5 w-2.5 rounded-sm bg-[#ef4444]" /> blocked
@@ -198,7 +279,7 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
           <Controls position="bottom-left" />
         </ReactFlow>
       </div>
-      <div className="max-h-[260px] overflow-auto p-4 text-xs">
+      <div className="max-h-[280px] overflow-auto p-4 text-xs">
         {visibleRound ? (
           <>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -212,34 +293,25 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
             </div>
 
             <div className="grid grid-cols-2 gap-2 mb-3 md:grid-cols-4">
-              <div className="rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
-                <div className="text-zinc-500">Judge</div>
-                <div className="font-mono text-xl text-zinc-50">{visibleRound.judge_score}/10</div>
-              </div>
-              <div className="rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
-                <div className="text-zinc-500">Detector Score</div>
-                <div className="font-mono text-xl text-zinc-50">
-                  {visibleRound.detector_score?.toFixed(2) ?? "-"}
-                </div>
-              </div>
-              <div className="rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
-                <div className="text-zinc-500">Parent</div>
-                <div className="font-mono text-xl text-zinc-50">
-                  {visibleRound.parent_round ?? "root"}
-                </div>
-              </div>
-              <div className="rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
-                <div className="text-zinc-500">Label</div>
-                <div className="font-mono text-sm text-zinc-50 truncate">
-                  {visibleRound.extra?.detector_label ?? "-"}
-                </div>
-              </div>
+              <MetricTile label="Judge" value={`${visibleRound.judge_score}/10`} />
+              <MetricTile label="Detector Score"
+                value={visibleRound.detector_score?.toFixed(2) ?? "—"} />
+              <MetricTile label="Parent"
+                value={visibleRound.parent_round == null ? "root" : String(visibleRound.parent_round)} />
+              <MetricTile label="Label"
+                value={visibleRound.extra?.detector_label ?? "—"} mono />
             </div>
 
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-              <DetailBlock title="Candidate Prompt" text={visibleRound.candidate_prompt} />
-              <DetailBlock title="Target Response" text={visibleRound.target_response} />
-              <DetailBlock title="Attacker Reasoning" text={visibleRound.extra?.improvement || "-"} />
+              <DetailBlock title="Candidate Prompt"
+                text={visibleRound.candidate_prompt}
+                onCopy={() => copyToClipboard(visibleRound.candidate_prompt)} />
+              <DetailBlock title="Target Response"
+                text={visibleRound.target_response}
+                onCopy={() => copyToClipboard(visibleRound.target_response)} />
+              <DetailBlock title="Attacker Reasoning"
+                text={visibleRound.extra?.improvement || "—"}
+                onCopy={() => copyToClipboard(visibleRound.extra?.improvement || "")} />
             </div>
             {visibleRound.extra?.depth != null && (
               <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
@@ -256,11 +328,31 @@ export function SessionGraph({ sessionId }: { sessionId: string }) {
   );
 }
 
-function DetailBlock({ title, text }: { title: string; text: string }) {
+function MetricTile({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
+      <div className="text-zinc-500">{label}</div>
+      <div className={`text-xl text-zinc-50 ${mono ? "font-mono text-sm truncate" : "font-mono"}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function DetailBlock({ title, text, onCopy }:
+  { title: string; text: string; onCopy?: () => void }) {
   return (
     <div>
-      <div className="mb-1 text-zinc-500">{title}</div>
-      <pre className="max-h-[140px] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 p-3 whitespace-pre-wrap leading-relaxed text-zinc-200">
+      <div className="mb-1 flex items-center justify-between text-zinc-500">
+        <span>{title}</span>
+        {onCopy && (
+          <button
+            onClick={onCopy}
+            className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            title="Copy to clipboard">copy ⧉</button>
+        )}
+      </div>
+      <pre className="max-h-[160px] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 p-3 whitespace-pre-wrap leading-relaxed text-zinc-200">
         {text}
       </pre>
     </div>
